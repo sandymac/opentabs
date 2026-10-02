@@ -56,8 +56,11 @@ import {
 } from './state.js';
 import { getSessionId, trackEvent } from './telemetry.js';
 
-/** Maximum incoming WebSocket message size (10MB) handled at the application layer */
-export const MAX_MESSAGE_SIZE = 10 * 1024 * 1024;
+/**
+ * Maximum incoming WebSocket message size (64 MiB) handled at the application
+ * layer, matching Chrome's extension-message cap on tool results.
+ */
+export const MAX_MESSAGE_SIZE = 64 * 1024 * 1024;
 
 /**
  * Write adapter IIFE files for all plugins in the registry.

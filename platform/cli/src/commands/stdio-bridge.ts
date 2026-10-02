@@ -304,7 +304,8 @@ const runBridge = async (port: number, secret: string, log: LogFn): Promise<void
   const rl = createInterface({ input: process.stdin });
   const inflight = new Set<Promise<void>>();
 
-  const MAX_BUFFER = 10 * 1024 * 1024;
+  // Matches the server's 64 MiB request body limit
+  const MAX_BUFFER = 64 * 1024 * 1024;
   let buffer = '';
 
   rl.on('line', (line: string) => {
