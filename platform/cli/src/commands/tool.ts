@@ -3,7 +3,7 @@
  */
 
 import { existsSync } from 'node:fs';
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { atomicWrite, DEFAULT_HOST, toErrorMessage } from '@opentabs-dev/shared';
 import type { Command } from 'commander';
@@ -192,20 +192,24 @@ export const parseFileMapping = (spec: string, flag: string): FileMapping => {
 
 /**
  * Set `value` at `segments`, creating objects (or arrays, for numeric next segments)
- * along the way. Array indexes may append but not skip, since holes serialize as null.
+ * along the way. Array indexes may append but not skip, since holes serialize as null,
+ * and arrays reject named keys, which JSON.stringify drops.
  */
 export const setField = (root: Record<string, unknown>, segments: string[], value: unknown): void => {
-  const checkIndex = (node: unknown, key: string, depth: number): void => {
-    if (Array.isArray(node) && Number(key) > node.length) {
-      throw new Error(
-        `Cannot set "${segments.join('.')}": index ${key} skips past the end of "${segments.slice(0, depth).join('.')}"`,
-      );
+  const checkArrayKey = (node: unknown, key: string, depth: number): void => {
+    if (!Array.isArray(node)) return;
+    const parent = segments.slice(0, depth).join('.');
+    if (!ARRAY_INDEX_PATTERN.test(key)) {
+      throw new Error(`Cannot set "${segments.join('.')}": "${parent}" is an array, so "${key}" must be an index`);
+    }
+    if (Number(key) > node.length) {
+      throw new Error(`Cannot set "${segments.join('.')}": index ${key} skips past the end of "${parent}"`);
     }
   };
   let node = root;
   for (let i = 0; i < segments.length - 1; i++) {
     const key = segments[i] as string;
-    checkIndex(node, key, i);
+    checkArrayKey(node, key, i);
     let next = Object.hasOwn(node, key) ? node[key] : undefined;
     if (next === undefined) {
       next = /^\d+$/.test(segments[i + 1] as string) ? [] : {};
@@ -216,7 +220,7 @@ export const setField = (root: Record<string, unknown>, segments: string[], valu
     node = next as Record<string, unknown>;
   }
   const last = segments.at(-1) as string;
-  checkIndex(node, last, segments.length - 1);
+  checkArrayKey(node, last, segments.length - 1);
   node[last] = value;
 };
 
@@ -237,11 +241,19 @@ export const decodeBase64Field = (result: unknown, { field, segments }: FileMapp
   const encoding = isContainer(parent) && Object.hasOwn(parent, 'encoding') ? parent.encoding : 'base64';
   if (encoding !== 'base64') throw new Error(`--save: field "${field}" has a non-base64 encoding`);
   const compact = value.replace(/\s+/g, '');
-  // Buffer.from silently drops a dangling (4k+1)th character, so reject that length.
-  if (!BASE64_PATTERN.test(compact) || compact.length % 4 === 1) {
+  const bytes = Buffer.from(compact, 'base64');
+  // Buffer.from silently drops dangling characters and stray bits, so require the input
+  // to equal the canonical encoding of what it decoded to.
+  const unpadded = compact.replace(/=+$/, '');
+  const canonical = bytes.toString('base64url');
+  if (
+    !BASE64_PATTERN.test(compact) ||
+    (unpadded !== compact && compact.length % 4 !== 0) ||
+    unpadded.replace(/\+/g, '-').replace(/\//g, '_') !== canonical
+  ) {
     throw new Error(`--save: field "${field}" is not valid base64`);
   }
-  return Buffer.from(compact, 'base64');
+  return bytes;
 };
 
 const collect = (value: string, previous: string[] = []): string[] => [...previous, value];
@@ -356,7 +368,13 @@ const handleToolCall = async (
       // Decode every field before writing any file so a bad field leaves the disk untouched.
       const decoded = saves.map(s => ({ ...s, bytes: decodeBase64Field(parsed, s) }));
       for (const { segments, path, bytes } of decoded) {
-        await atomicWrite(path, bytes);
+        // Without --force, create exclusively in case the file appeared during the call.
+        if (options.force) await atomicWrite(path, bytes);
+        else
+          await writeFile(path, bytes, { flag: 'wx' }).catch((err: unknown) => {
+            if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err;
+            throw new Error(`--save: ${path} already exists (use --force to overwrite)`);
+          });
         setField(parsed, segments, { savedTo: path, bytes: bytes.length });
       }
       console.log(JSON.stringify(parsed, null, 2));

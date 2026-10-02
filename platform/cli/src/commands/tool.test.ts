@@ -147,6 +147,10 @@ describe('setField', () => {
     expect(args).toEqual({ attachments: [{ filename: 'a.pdf', content: 'QQ==' }] });
   });
 
+  test('throws on a named key into an existing array', () => {
+    expect(() => setField({ attachments: [] }, ['attachments', 'content'], 'QQ==')).toThrow('must be an index');
+  });
+
   test('throws when an intermediate value is a primitive', () => {
     expect(() => setField({ a: 'text' }, ['a', 'b'], 1)).toThrow('"a" is not an object');
   });
@@ -171,6 +175,10 @@ describe('decodeBase64Field', () => {
     expect(() => decodeBase64Field({ image: 1 }, mapping('image'))).toThrow('not a string');
     expect(() => decodeBase64Field({ image: 'not base64!' }, mapping('image'))).toThrow('not valid base64');
     expect(() => decodeBase64Field({ image: 'AAAAY' }, mapping('image'))).toThrow('not valid base64');
+  });
+
+  test.each(['A=', 'AA=', 'AB', 'QR==', 'QUJ='])('rejects non-canonical %s', image => {
+    expect(() => decodeBase64Field({ image }, mapping('image'))).toThrow('not valid base64');
   });
 
   test('accepts line-wrapped and base64url content', () => {
