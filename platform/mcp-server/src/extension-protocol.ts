@@ -506,9 +506,10 @@ const handleExtensionMessage = (
   callbacks: McpCallbacks,
   senderWs?: WsHandle,
 ): void => {
-  if (text.length > MAX_MESSAGE_SIZE) {
+  const bytes = Buffer.byteLength(text);
+  if (bytes > MAX_MESSAGE_SIZE) {
     log.warn(
-      `Dropping oversized WebSocket message (${(text.length / 1024 / 1024).toFixed(1)}MB, limit ${MAX_MESSAGE_SIZE / 1024 / 1024}MB)`,
+      `Dropping oversized WebSocket message (${(bytes / 1024 / 1024).toFixed(1)}MiB, limit ${MAX_MESSAGE_SIZE / 1024 / 1024}MiB)`,
     );
     return;
   }

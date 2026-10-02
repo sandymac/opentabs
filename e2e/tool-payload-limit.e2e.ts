@@ -36,6 +36,6 @@ test.describe('Tool payload size limits', () => {
 
     expect(result.isError).toBe(true);
     expect(result.content).toContain('Tool input too large');
-    expect(result.content).toContain('limit: 63MB');
+    expect(result.content).toContain('limit: 63MiB');
   });
 });

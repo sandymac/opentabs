@@ -266,8 +266,6 @@ describe('handleToolDispatch', () => {
     const multiByteValue = '€'.repeat(Math.ceil(MAX_INPUT_SIZE / 3));
     await handleToolDispatch({ plugin: 'slack', tool: 'send-message', input: { data: multiByteValue } }, 'req-6b');
 
-    if (mockSendToServer.mock.calls.length === 0) return;
-
     const msg = firstSentMessage() as { error: { code: number; message: string } };
     expect(msg.error.code).toBe(-32602);
     expect(msg.error.message).toContain('too large');

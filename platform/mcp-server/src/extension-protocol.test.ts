@@ -665,6 +665,18 @@ describe('handleExtensionMessage — message size limit', () => {
     expect(getMergedTabMapping(state).size).toBe(0);
     expect(state.pendingDispatches.size).toBe(0);
   });
+
+  test('measures message size in UTF-8 bytes', () => {
+    const ws = createMockWs();
+    // Fewer UTF-16 code units than MAX_MESSAGE_SIZE, but over it in UTF-8 bytes
+    const base = JSON.stringify({ jsonrpc: '2.0', method: 'ping', params: { pad: '' } });
+    const multiByte = base.replace('""', `"${'€'.repeat(Math.ceil(MAX_MESSAGE_SIZE / 3))}"`);
+    expect(multiByte.length).toBeLessThan(MAX_MESSAGE_SIZE);
+
+    handleExtensionMessage(createState(), multiByte, noopCallbacks, ws);
+
+    expect(ws.sent).toHaveLength(0);
+  });
 });
 
 describe('handleExtensionMessage — malformed JSON', () => {

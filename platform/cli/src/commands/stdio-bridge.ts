@@ -310,7 +310,7 @@ const runBridge = async (port: number, secret: string, log: LogFn): Promise<void
 
   rl.on('line', (line: string) => {
     buffer += line;
-    if (buffer.length > MAX_BUFFER) {
+    if (Buffer.byteLength(buffer) > MAX_BUFFER) {
       log('Buffer overflow, resetting');
       buffer = '';
       return;

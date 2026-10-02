@@ -366,7 +366,7 @@ const handleToolDispatch = async (params: Record<string, unknown>, id: string | 
       jsonrpc: '2.0',
       error: {
         code: JSONRPC_INVALID_PARAMS,
-        message: `Tool input too large: ${(inputBytes / 1024 / 1024).toFixed(1)}MB (limit: ${MAX_INPUT_SIZE / 1024 / 1024}MB)`,
+        message: `Tool input too large: ${(inputBytes / 1024 / 1024).toFixed(1)}MiB (limit: ${MAX_INPUT_SIZE / 1024 / 1024}MiB)`,
       },
       id,
     });
